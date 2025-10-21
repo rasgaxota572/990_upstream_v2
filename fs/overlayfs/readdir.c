@@ -915,8 +915,8 @@ static int ovl_dir_open(struct inode *inode, struct file *file)
 	od = kzalloc(sizeof(struct ovl_dir_file), GFP_KERNEL);
 	if (!od)
 		return -ENOMEM;
-
 	type = ovl_path_real(file->f_path.dentry, &realpath);
+
 	realfile = ovl_dir_open_realfile(file, &realpath);
 	if (IS_ERR(realfile)) {
 		kfree(od);
