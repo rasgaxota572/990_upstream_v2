@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Minimal comments in English
+# Enhanced offline-capable build.sh for Exynos kernel with KernelSU + SuSFS
 set -euo pipefail
 
 abort() {
@@ -18,7 +18,7 @@ Options:
   -r, --recovery [y/N]        build for recovery (sets ksu=n)
   -d, --dtbs [y/N]            build only DTBs
   --clean                     full clean rebuild (preserve out/)
-  --susfs-version <version>   manually set SUSFS version (e.g. v1.5.11)
+  --susfs-version <version>   manually set SUSFS version (e.g. v1.5.10)
   -h, --help                  show this help
 EOF
 }
@@ -55,19 +55,30 @@ echo "Preparing build environment..."
 pushd "$(dirname "$0")" > /dev/null || abort
 
 CORES=$(grep -c processor /proc/cpuinfo || echo 4)
+TOOLCHAIN_CACHE="$PWD/toolchain/cache"
 CLANG_DIR="$PWD/toolchain/clang_14"
+CLANG_ARCHIVE_NAME="clang-r450784d.tar.gz"
+CLANG_URL="https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-13.0.0_r13/${CLANG_ARCHIVE_NAME}"
 PATH="$CLANG_DIR/bin:$PATH"
 
-# fetch toolchain if missing
+# --------------------------------------------------------------------
+# Fetch toolchain (with offline cache)
+# --------------------------------------------------------------------
 if [[ ! -x "$CLANG_DIR/bin/clang-14" ]]; then
-    echo "Toolchain not found, downloading..."
-    rm -rf "$CLANG_DIR"
+    echo "[+] Toolchain not found, checking cache..."
+    mkdir -p "$TOOLCHAIN_CACHE"
     mkdir -p "$CLANG_DIR"
-    pushd "$CLANG_DIR" > /dev/null
-    curl -LJO "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-13.0.0_r13/clang-r450784d.tar.gz"
-    tar xf clang-r450784d.tar.gz
-    rm -f clang-r450784d.tar.gz
-    popd > /dev/null
+
+    if [[ -f "$TOOLCHAIN_CACHE/$CLANG_ARCHIVE_NAME" ]]; then
+        echo "[+] Using cached toolchain: $TOOLCHAIN_CACHE/$CLANG_ARCHIVE_NAME"
+        tar -xf "$TOOLCHAIN_CACHE/$CLANG_ARCHIVE_NAME" -C "$CLANG_DIR"
+    else
+        echo "[+] Cache not found, downloading toolchain..."
+        pushd "$CLANG_DIR" > /dev/null
+        curl -L "$CLANG_URL" | tee "$TOOLCHAIN_CACHE/$CLANG_ARCHIVE_NAME" | tar -xz
+        popd > /dev/null
+        echo "[+] Toolchain cached successfully at $TOOLCHAIN_CACHE/$CLANG_ARCHIVE_NAME"
+    fi
 fi
 
 MAKE_ARGS="LLVM=1 LLVM_IAS=1 ARCH=arm64 O=out"
@@ -87,12 +98,10 @@ case "$MODEL" in
     *) echo "Unknown model: $MODEL"; usage; exit 1 ;;
 esac
 
-# clean build option
+# clean build
 if [[ "$CLEAN_BUILD" == true ]]; then
     echo "Performing full clean rebuild (preserving out/)..."
-    # keep out/ to avoid re-downloading toolchains etc, but remove build artifacts
     rm -rf build/out/"$MODEL" build/tmp
-    # leave 'out' alone
     make mrproper >/dev/null 2>&1 || true
 fi
 
@@ -127,6 +136,7 @@ echo "-----------------------------------------------"
 echo "Generating .config..."
 make ${MAKE_ARGS} -j"$CORES" exynos9830_defconfig "${MODEL}.config" ${KSU:-} ${RECOVERY:-} || abort
 
+# build kernel or dtbs
 if [[ -n "${DTBS:-}" ]]; then
     MAKE_ARGS="$MAKE_ARGS dtbs"
     echo "Building DTBs only mode"
@@ -134,28 +144,21 @@ else
     echo "Building kernel..."
 fi
 
-# build
-echo "-----------------------------------------------"
 make ${MAKE_ARGS} -j"$CORES" || abort
 
-# detect SUSFS version (search common locations), fallback to manual param
+# detect SUSFS version
 detect_susfs_version() {
-    # Try to find common macros/strings that represent version
-    # Search include/linux and drivers for likely patterns
     local v
     v=$(grep -RsohE 'SUSFS_VERSION[[:space:][:punct:]]*[=:]?[[:space:]]*"?v[0-9]+(\.[0-9]+)*\+?' include/linux drivers 2>/dev/null | head -n1 || true)
     if [[ -n "$v" ]]; then
-        # extract vX.Y.Z
         echo "$v" | grep -oE 'v[0-9]+(\.[0-9]+)*' || echo "unknown"
         return
     fi
-    # try patterns like #define SUSFS_VERSION "v1.5.11"
     v=$(grep -RsohE '#define[[:space:]]+SUSFS_VERSION[[:space:]]+"?v[0-9]+(\.[0-9]+)*"?' include/linux drivers 2>/dev/null | head -n1 || true)
     if [[ -n "$v" ]]; then
         echo "$v" | grep -oE 'v[0-9]+(\.[0-9]+)*' || echo "unknown"
         return
     fi
-    # try searching for "SUSFS" string followed by v
     v=$(grep -RsohE 'susfs[-_ ]?v[0-9]+(\.[0-9]+)*' include/linux drivers 2>/dev/null | head -n1 || true)
     if [[ -n "$v" ]]; then
         echo "$v" | grep -oE 'v[0-9]+(\.[0-9]+)*' || echo "unknown"
@@ -164,7 +167,6 @@ detect_susfs_version() {
     echo "unknown"
 }
 
-# prefer manual override
 if [[ -n "$MANUAL_SUSFS_VERSION" ]]; then
     SUSFS_VERSION="$MANUAL_SUSFS_VERSION"
 else
@@ -172,58 +174,37 @@ else
 fi
 echo "Detected SUSFS version: ${SUSFS_VERSION}"
 
-# prepare artifact paths
+# artifact paths
 DTB_PATH=build/out/"$MODEL"/dtb.img
 DTBO_PATH=build/out/"$MODEL"/dtbo.img
 KERNEL_IMAGE_SRC=out/arch/arm64/boot/Image
 KERNEL_IMAGE_DST=build/out/"$MODEL"/Image
-RAMDISK_SRC=out/"$MODEL"/ramdisk.cpio.gz
 RAMDISK_DST=build/out/"$MODEL"/ramdisk.cpio.gz
 BOOT_IMG=build/out/"$MODEL"/boot.img
 
-# ensure kernel image exists (copy from out if needed)
 if [[ ! -s "$KERNEL_IMAGE_DST" ]]; then
     if [[ -s "${KERNEL_IMAGE_SRC}" ]]; then
-        echo "Copying kernel Image to build/out/${MODEL}/"
+        echo "Copying kernel Image..."
         cp "${KERNEL_IMAGE_SRC}" "${KERNEL_IMAGE_DST}"
     else
-        echo "Error: kernel Image missing at ${KERNEL_IMAGE_SRC}"
+        echo "Error: kernel Image missing!"
         abort
     fi
 fi
 
-# Build DTB/DTBO
-echo "Building exynos9830 DTB..."
+# dtb/dtbo
+echo "Building DTB..."
 ./toolchain/mkdtimg cfg_create "$DTB_PATH" build/dtconfigs/exynos9830.cfg -d out/arch/arm64/boot/dts/exynos
-
-echo "Building DTBO for ${MODEL}..."
+echo "Building DTBO..."
 ./toolchain/mkdtimg cfg_create "$DTBO_PATH" build/dtconfigs/"${MODEL}".cfg -d out/arch/arm64/boot/dts/samsung
 
-# Build ramdisk
+# ramdisk
 echo "Building RAMDisk..."
 pushd build/ramdisk > /dev/null
-if ! find . ! -name . | LC_ALL=C sort | cpio -o -H newc -R root:root | gzip > ../out/"${MODEL}"/ramdisk.cpio.gz ; then
-    echo "Failed to build ramdisk"
-    popd > /dev/null
-    abort
-fi
+find . ! -name . | LC_ALL=C sort | cpio -o -H newc -R root:root | gzip > ../out/"${MODEL}"/ramdisk.cpio.gz
 popd > /dev/null
 
-# final sanity checks before mkbootimg
-if [[ ! -s "$KERNEL_IMAGE_DST" ]]; then
-    echo "Error: kernel Image missing or empty at $KERNEL_IMAGE_DST"
-    abort
-fi
-if [[ ! -s "$DTB_PATH" ]]; then
-    echo "Error: dtb missing at $DTB_PATH"
-    abort
-fi
-if [[ ! -s "build/out/${MODEL}/ramdisk.cpio.gz" ]]; then
-    echo "Error: ramdisk missing at build/out/${MODEL}/ramdisk.cpio.gz"
-    abort
-fi
-
-# create boot image
+# mkbootimg
 echo "Creating boot image..."
 ./toolchain/mkbootimg \
     --base 0x10000000 --board "$BOARD" \
@@ -231,11 +212,11 @@ echo "Creating boot image..."
     --dtb "$DTB_PATH" --dtb_offset 0x00000000 --hashtype sha1 \
     --header_version 2 --kernel "$KERNEL_IMAGE_DST" --kernel_offset 0x00008000 \
     --os_patch_level 2025-08 --os_version 15.0.0 --pagesize 2048 \
-    --ramdisk "build/out/${MODEL}/ramdisk.cpio.gz" --ramdisk_offset 0x01000000 \
+    --ramdisk "$RAMDISK_DST" --ramdisk_offset 0x01000000 \
     --second_offset 0xF0000000 --tags_offset 0x00000100 \
     -o "$BOOT_IMG" || abort
 
-# pack flashable zip
+# zip
 echo "Packing flashable zip..."
 mkdir -p build/out/"$MODEL"/zip/files
 cp "$BOOT_IMG" build/out/"$MODEL"/zip/files/boot.img
@@ -257,7 +238,7 @@ popd > /dev/null
 echo "-----------------------------------------------"
 echo "Build completed: build/out/${MODEL}/${ZIP_NAME}"
 echo "SUSFS version: ${SUSFS_VERSION}"
-echo "Build finished successfully!"
+echo "Toolchain cache: ${TOOLCHAIN_CACHE}/${CLANG_ARCHIVE_NAME}"
 echo "-----------------------------------------------"
 
 popd > /dev/null
