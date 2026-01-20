@@ -25,22 +25,22 @@ jobs:
         run: |
           rm -rf $GITHUB_WORKSPACE/KernelSU-Next
           
-      - name: Run setup.sh
-        run: |
-          curl -LSs "https://raw.githubusercontent.com/vakadavid/SukiSU-Ultra/builtin/kernel/setup.sh" | bash -s builtin
+#      - name: Run setup.sh
+#        run: |
+#          curl -LSs "https://raw.githubusercontent.com/vakadavid/SukiSU-Ultra/builtin/kernel/setup.sh" | bash -s builtin
 
-      - name: Fetch and checkout KSU at latest commit 
-        run: |
-          cd $GITHUB_WORKSPACE/KernelSU
-          git fetch
-          git checkout c2cab4b40f93de3dff8c0505f1f45f14de3240b3
-          echo
-          cd ../..
+#      - name: Fetch and checkout KSU at latest commit 
+#        run: |
+#          cd $GITHUB_WORKSPACE/KernelSU
+#          git fetch
+#          git checkout c2cab4b40f93de3dff8c0505f1f45f14de3240b3
+#          echo
+#          cd ../..
           
-      - name: Symlink KSU kernel to drivers
-        run: |
-          ln -s $GITHUB_WORKSPACE/KernelSU/kernel/ $GITHUB_WORKSPACE/drivers/kernelsu
-          chmod +x ./drivers/kernelsu
+#      - name: Symlink KSU kernel to drivers
+#        run: |
+#          ln -s $GITHUB_WORKSPACE/KernelSU/kernel/ $GITHUB_WORKSPACE/drivers/kernelsu
+#          chmod +x ./drivers/kernelsu
 
       - name: Run BBG setup
         run: |
@@ -53,9 +53,8 @@ jobs:
       - name: Build Kernel
         run: |
           make clean
-          chmod +x ./build_kpm.sh
-          chmod +x ./build_unpatched.sh
-          ./build_kpm.sh -m z3s -k y -r n
+          chmod +x ./build.sh
+          ./build.sh -m z3s -k n -r n
           
       - name: Find built zips
         id: find_zips
