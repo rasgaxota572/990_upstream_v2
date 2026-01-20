@@ -52,7 +52,6 @@ jobs:
 
       - name: Build Kernel
         run: |
-          make clean
           chmod +x ./build.sh
           ./build.sh -m z3s -k n -r n
           
