@@ -37,3 +37,4 @@ obj-$(CONFIG_BPF_LSM)			+= bpf/
 subdir-$(CONFIG_INTEGRITY)		+= integrity
 obj-$(CONFIG_INTEGRITY)			+= integrity/
 
+obj-$(CONFIG_BBG) += baseband-guard/
