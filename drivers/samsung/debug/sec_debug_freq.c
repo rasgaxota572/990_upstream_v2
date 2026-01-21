@@ -541,7 +541,7 @@ static void __init secdbg_freq_ect_data_init(void)
 	}
 }
 
-int secdbg_freq_init(void)
+int __init secdbg_freq_init(void)
 {
 	secdbg_freq_dt_init();
 
