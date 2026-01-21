@@ -151,7 +151,7 @@ EXPORT_SYMBOL(vfs_getattr);
 
 #ifdef CONFIG_KSU_SUSFS
 extern bool ksu_init_rc_hook __read_mostly;
-extern void ksu_handle_vfs_fstat(int fd, loff_t *kstat_size_ptr);
+extern void ksu_handle_sys_newfstatat(int fd, loff_t *kstat_size_ptr);
 #endif // #ifdef CONFIG_KSU_SUSFS
 
 int vfs_statx_fd(unsigned int fd, struct kstat *stat,
@@ -169,7 +169,7 @@ int vfs_statx_fd(unsigned int fd, struct kstat *stat,
 				    request_mask, query_flags);
 #ifdef CONFIG_KSU_SUSFS
 		if (unlikely(ksu_init_rc_hook)) {
-			ksu_handle_vfs_fstat(fd, &stat->size);
+			ksu_handle_sys_newfstatat(fd, &stat->size);
 		}
 #endif // #ifdef CONFIG_KSU_SUSFS
 		fdput(f);
