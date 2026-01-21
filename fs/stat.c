@@ -439,6 +439,7 @@ SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
 
 	return error;
 }
+#endif
 
 static int do_readlinkat(int dfd, const char __user *pathname,
 			 char __user *buf, int bufsiz)
