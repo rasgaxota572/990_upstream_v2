@@ -78,6 +78,9 @@
 #endif
 
 #include "uid16.h"
+#ifdef CONFIG_HYMOFS
+#include <linux/hymofs.h>
+#endif
 
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a, b)	(-EINVAL)
@@ -1298,6 +1301,9 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 	}
 #endif
 	up_read(&uts_sem);
+#ifdef CONFIG_HYMOFS_UNAME_SPOOF
+    hymofs_spoof_uname(&tmp);
+#endif
 	if (copy_to_user(name, &tmp, sizeof(tmp)))
 		return -EFAULT;
 
@@ -1322,6 +1328,9 @@ SYSCALL_DEFINE1(uname, struct old_utsname __user *, name)
 	down_read(&uts_sem);
 	memcpy(&tmp, utsname(), sizeof(tmp));
 	up_read(&uts_sem);
+#ifdef CONFIG_HYMOFS_UNAME_SPOOF
+    hymofs_spoof_uname((struct new_utsname *)&tmp);
+#endif
 	if (copy_to_user(name, &tmp, sizeof(tmp)))
 		return -EFAULT;
 

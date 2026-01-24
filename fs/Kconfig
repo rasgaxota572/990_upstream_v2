@@ -334,4 +334,138 @@ config FS_HPB
 	bool "Support HPB on Filesystem"
 	default n
 
+menu "HymoFS"
+
+config HYMOFS
+	bool "HymoFS Support"
+	default y
+	help
+	  HymoFS is a kernel-level path manipulation and hiding framework.
+	  It provides various file system virtualization capabilities for
+	  advanced users and security researchers.
+	  
+	  If unsure, say N.
+
+config HYMOFS_REVERSE_LOOKUP
+	bool "Enable reverse path lookup (d_path hooks)"
+	depends on HYMOFS
+	default y
+	help
+	  Allow converting real paths back to virtual paths when userspace
+	  queries file paths. This is the reverse operation of forward redirect.
+	  
+	  - Low performance overhead (~5% on path resolution)
+	  - Effective on all processes
+	  - Required for complete path hiding
+	  
+	  If unsure, say Y.
+
+config HYMOFS_FORWARD_REDIRECT
+	bool "Enable forward path redirection (namei hooks)"
+	depends on HYMOFS
+	default y
+	help
+	  Allow redirecting virtual paths to real paths during file opening.
+	  This is the forward operation complementary to reverse lookup.
+	  
+	  - Low performance overhead (~3% on file open)
+	  - Effective on all processes
+	  - Required for path redirection
+	  
+	  If unsure, say Y.
+
+config HYMOFS_HIDE_ENTRIES
+	bool "Enable directory entry hiding"
+	depends on HYMOFS
+	default y
+	help
+	  Allow hiding user-defined files and directories from directory listing.
+	  
+	  - Medium performance overhead (~10% on directory traversal)
+	  - Effective on all processes
+	  - Uses in-kernel filtering during readdir()
+	  
+	  If unsure, say Y.
+
+config HYMOFS_INJECT_ENTRIES
+	bool "Enable directory entry injection (experimental)"
+	depends on HYMOFS
+	default y
+	help
+	  Allow injecting virtual files/directories into directory listings.
+	  
+	  - Medium-high performance overhead (~15% on directory traversal)
+	  - Effective on all processes
+	  - Experimental feature, may cause stability issues
+	  
+	  Disable if you don't need virtual files or care about performance.
+	  If unsure, say N.
+
+config HYMOFS_STAT_SPOOF
+	bool "Enable stat/kstat spoofing"
+	depends on HYMOFS
+	default y
+	help
+	  Allow spoofing file metadata (size, timestamps, mode, etc.).
+	  
+	  - Low performance overhead (~2% on stat calls)
+	  - Effective only on zygote spawned user app processes
+	  
+	  Disable if you don't need metadata manipulation.
+	  If unsure, say N.
+
+config HYMOFS_XATTR_FILTER
+	bool "Enable extended attributes filtering"
+	depends on HYMOFS
+	default y
+	help
+	  Allow filtering/spoofing extended attributes (xattr).
+	  
+	  - Very low performance overhead (~1% on xattr operations)
+	  - Effective on all processes
+	  - Commonly used to hide SELinux contexts
+	  
+	  If unsure, say Y.
+
+config HYMOFS_UNAME_SPOOF
+	bool "Enable uname spoofing"
+	depends on HYMOFS
+	default y
+	help
+	  Allow spoofing the output of uname syscall.
+	  
+	  - Negligible performance overhead
+	  - Effective on all processes
+	  
+	  Disable if you don't need to hide kernel version.
+	  If unsure, say N.
+
+config HYMOFS_CMDLINE_SPOOF
+	bool "Enable cmdline/bootconfig spoofing"
+	depends on HYMOFS
+	default y
+	help
+	  Allow spoofing /proc/cmdline and /proc/bootconfig.
+	  
+	  - Negligible performance overhead
+	  - Effective on all processes
+	  
+	  Disable if you don't need to hide boot parameters.
+	  If unsure, say N.
+
+config HYMOFS_DEBUG
+	bool "Enable HymoFS debug logging"
+	depends on HYMOFS
+	default n
+	help
+	  Enable verbose debug logging for HymoFS operations.
+	  
+	  - High performance overhead (for debugging only)
+	  - Logs all hook invocations to kernel log
+	  
+	  MUST be disabled in production builds.
+	  If unsure, say N.
+
+endmenu
+
 endmenu

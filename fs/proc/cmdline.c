@@ -4,6 +4,9 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <asm/setup.h>
+#ifdef CONFIG_HYMOFS
+#include <linux/hymofs.h>
+#endif
 
 enum {
 	FLAG_DELETE = 0,
@@ -20,6 +23,13 @@ static int cmdline_proc_show(struct seq_file *m, void *v)
 {
 #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
 	if (!susfs_spoof_cmdline_or_bootconfig(m)) {
+		seq_putc(m, '\n');
+		return 0;
+	}
+#endif
+#ifdef CONFIG_HYMOFS_CMDLINE_SPOOF
+	/* HymoFS: try to spoof cmdline, returns 0 if spoofed */
+	if (hymofs_spoof_cmdline(m) == 0) {
 		seq_putc(m, '\n');
 		return 0;
 	}
