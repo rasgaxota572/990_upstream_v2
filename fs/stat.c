@@ -27,9 +27,6 @@
 
 #include "internal.h"
 #include "mount.h"
-#ifdef CONFIG_HYMOFS
-#include <linux/hymofs.h>
-#endif
 
 /**
  * generic_fillattr - Fill in the basic attributes from the inode struct
@@ -114,36 +111,11 @@ int vfs_getattr_nosec(const struct path *path, struct kstat *stat,
 	stat->attributes_mask |= (STATX_ATTR_AUTOMOUNT |
 				  STATX_ATTR_DAX);
 
-#ifdef CONFIG_HYMOFS
-    if (inode->i_op->getattr) {
-        int ret = inode->i_op->getattr(path, stat, request_mask,
-                        query_flags);
-#ifdef CONFIG_HYMOFS_STAT_SPOOF
-        if (ret == 0) {
-            hymofs_spoof_stat(path, stat);
-            /* Apply full kstat spoofing if configured for this inode */
-            if (hymofs_is_kstat_spoofed(inode)) {
-                hymofs_spoof_kstat_by_ino(inode->i_ino, stat);
-            }
-        }
-#endif
-        return ret;
-    }
-#else
 	if (inode->i_op->getattr)
 		return inode->i_op->getattr(path, stat, request_mask,
 					    query_flags);
-#endif
 
 	generic_fillattr(inode, stat);
-#ifdef CONFIG_HYMOFS_STAT_SPOOF
-    /* HymoFS: Spoof timestamps if needed */
-    hymofs_spoof_stat(path, stat);
-    /* Apply full kstat spoofing if configured for this inode */
-    if (hymofs_is_kstat_spoofed(inode)) {
-        hymofs_spoof_kstat_by_ino(inode->i_ino, stat);
-    }
-#endif
 	return 0;
 }
 EXPORT_SYMBOL(vfs_getattr_nosec);
@@ -235,9 +207,6 @@ static int vfs_statx(int dfd, const char __user *filename, int flags,
 	struct path path;
 	unsigned lookup_flags = 0;
 	int error;
-#ifdef CONFIG_HYMOFS
-	struct filename *hymo_filename = NULL;
-#endif
 
 #ifdef CONFIG_KSU_SUSFS
 	if (likely(susfs_is_current_proc_umounted()) || !ksu_su_compat_enabled) {
@@ -264,24 +233,6 @@ orig_flow:
 
 retry:
 	error = user_path_at(dfd, filename, lookup_flags, &path);
-
-#ifdef CONFIG_HYMOFS_FORWARD_REDIRECT
-	/* HymoFS: Handle merge directory - relative path + dirfd case */
-	/* 5.15 uses const char __user * for filename */
-	if (error == -ENOENT && dfd >= 0) {
-		char first_char;
-		if (get_user(first_char, filename) == 0 && first_char != '/') {
-			struct filename *kern_filename = getname(filename);
-			if (!IS_ERR(kern_filename)) {
-				hymo_filename = hymofs_resolve_relative(dfd, kern_filename->name);
-				putname(kern_filename);
-				if (hymo_filename)
-					error = filename_lookup(AT_FDCWD, hymo_filename, lookup_flags, &path, NULL);
-			}
-		}
-	}
-#endif
-
 	if (error)
 		goto out;
 
@@ -297,10 +248,6 @@ retry:
 		goto retry;
 	}
 out:
-#ifdef CONFIG_HYMOFS
-	if (hymo_filename)
-		putname(hymo_filename);
-#endif
 	return error;
 }
 
