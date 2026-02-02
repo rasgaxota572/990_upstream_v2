@@ -585,6 +585,62 @@ void susfs_sus_ino_for_show_map_vma(unsigned long ino, dev_t *out_dev, unsigned 
 }
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 
+/* try_umount */
+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
+static DEFINE_SPINLOCK(susfs_spin_lock_try_umount);
+extern void try_umount(const char *mnt, int flags);
+static LIST_HEAD(LH_TRY_UMOUNT_PATH);
+void susfs_add_try_umount(void __user **user_info) {
+	struct st_susfs_try_umount info = {0};
+	struct st_susfs_try_umount_list *new_list = NULL;
+
+	if (copy_from_user(&info, (struct st_susfs_try_umount __user*)*user_info, sizeof(info))) {
+		info.err = -EFAULT;
+		goto out_copy_to_user;
+	}
+
+	if (info.mnt_mode == TRY_UMOUNT_DEFAULT) {
+		info.mnt_mode = 0;
+	} else if (info.mnt_mode == TRY_UMOUNT_DETACH) {
+		info.mnt_mode = MNT_DETACH;
+	} else {
+		SUSFS_LOGE("Unsupported mnt_mode: %d\n", info.mnt_mode);
+		info.err = -EINVAL;
+		goto out_copy_to_user;
+	}
+
+	new_list = kmalloc(sizeof(struct st_susfs_try_umount_list), GFP_KERNEL);
+	if (!new_list) {
+		info.err = -ENOMEM;
+		goto out_copy_to_user;
+	}
+
+	memcpy(&new_list->info, &info, sizeof(info));
+
+	INIT_LIST_HEAD(&new_list->list);
+	spin_lock(&susfs_spin_lock_try_umount);
+	list_add_tail(&new_list->list, &LH_TRY_UMOUNT_PATH);
+	spin_unlock(&susfs_spin_lock_try_umount);
+	SUSFS_LOGI("target_pathname: '%s', umount options: %d, is successfully added to LH_TRY_UMOUNT_PATH\n", new_list->info.target_pathname, new_list->info.mnt_mode);
+	info.err = 0;
+out_copy_to_user:
+	if (copy_to_user(&((struct st_susfs_try_umount __user*)*user_info)->err, &info.err, sizeof(info.err))) {
+		info.err = -EFAULT;
+	}
+	SUSFS_LOGI("CMD_SUSFS_ADD_TRY_UMOUNT -> ret: %d\n", info.err);
+}
+
+void susfs_try_umount(uid_t uid) {
+	struct st_susfs_try_umount_list *cursor = NULL;
+
+	// We should umount in reversed order
+	list_for_each_entry_reverse(cursor, &LH_TRY_UMOUNT_PATH, list) {
+		SUSFS_LOGI("umounting '%s' for uid: %u\n", cursor->info.target_pathname, uid);
+		try_umount(cursor->info.target_pathname, cursor->info.mnt_mode);
+	}
+}
+#endif // #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
+
 /* spoof_uname */
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
 static DEFINE_SPINLOCK(susfs_spin_lock_set_uname);
@@ -907,6 +963,11 @@ void susfs_get_enabled_features(void __user **user_info) {
 	if (info->err) goto out_copy_to_user;
 	buf_ptr = info->enabled_features + copied_size;
 #endif
+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
+	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_TRY_UMOUNT\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
+	if (info->err) goto out_copy_to_user;
+	buf_ptr = info->enabled_features + copied_size;
+#endif
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_SPOOF_UNAME\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
@@ -993,45 +1054,45 @@ bool susfs_is_sdcard_android_data_decrypted __read_mostly = false;
 static struct task_struct *susfs_sdcard_monitor_thread;
 static int susfs_sdcard_monitor_fn(void *data)
 {
-    struct path path;
-    int error;
+	struct path path;
+	int error;
 
-    SUSFS_LOGI("Start monitoring path '%s'\n", SDCARD_ANDROID_DATA_PATH);
+	SUSFS_LOGI("Start monitoring path '%s'\n", SDCARD_ANDROID_DATA_PATH);
 
-    setup_selinux("u:r:su:s0");
+	setup_selinux("u:r:su:s0");
 
-    if (!susfs_is_current_ksu_domain()) {
-        SUSFS_LOGE("Domain is not su, exiting the thread\n");
-        susfs_sdcard_monitor_thread = NULL;
-        return 0;
-    }
+	if (!susfs_is_current_ksu_domain()) {
+		SUSFS_LOGE("Domain is not su, exiting the thread\n");
+		susfs_sdcard_monitor_thread = NULL;
+		return 0;
+	}
 
-    while (!kthread_should_stop()) {
-        error = kern_path(SDCARD_ANDROID_DATA_PATH, LOOKUP_FOLLOW, &path);
+	while (!kthread_should_stop()) {
+		error = kern_path(SDCARD_ANDROID_DATA_PATH, LOOKUP_FOLLOW, &path);
 
-        if (!error) {
-            SUSFS_LOGI("'%s' is now accessible\n", SDCARD_ANDROID_DATA_PATH);
-            path_put(&path);
+		if (!error) {
+			SUSFS_LOGI("'%s' is now accessible\n", SDCARD_ANDROID_DATA_PATH);
+			path_put(&path);
 
-            SUSFS_LOGI("Sleeping for 5 more seconds just in case some other modules are still mounting stuff\n");
-            msleep(5000);
+			SUSFS_LOGI("Sleeping for 5 more seconds just in case some other modules are still mounting stuff\n");
+			msleep(5000);
 
-            SUSFS_LOGI("Setting susfs_is_sdcard_android_data_decrypted to true\n");
+			SUSFS_LOGI("Setting susfs_is_sdcard_android_data_decrypted to true\n");
 
-            WRITE_ONCE(susfs_is_sdcard_android_data_decrypted, true);
-            WRITE_ONCE(susfs_sdcard_monitor_thread, NULL);
+			WRITE_ONCE(susfs_is_sdcard_android_data_decrypted, true);
+			WRITE_ONCE(susfs_sdcard_monitor_thread, NULL);
 
-            return 0;
-        }
+			return 0;
+		}
 
-        msleep(5000);
-    }
+		msleep(5000);
+	}
 
-    return 0;
+	return 0;
 }
 
 void susfs_start_sdcard_monitor_fn(void) {
-    susfs_sdcard_monitor_thread = kthread_run(susfs_sdcard_monitor_fn, NULL, "susfs_sdcard_monitor");
+	susfs_sdcard_monitor_thread = kthread_run(susfs_sdcard_monitor_fn, NULL, "susfs_sdcard_monitor");
     if (IS_ERR(susfs_sdcard_monitor_thread)) {
         SUSFS_LOGE("Failed to create thread susfs_sdcard_monitor\n");
     }
