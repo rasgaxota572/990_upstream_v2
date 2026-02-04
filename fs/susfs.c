@@ -33,7 +33,7 @@ bool susfs_is_log_enabled __read_mostly = true;
 
 bool susfs_starts_with(const char *str, const char *prefix) {
     while (*prefix) {
-        if (*str++ != *prefix++)
+        if (*str != *prefix)
             return false;
     }
     return true;
@@ -923,7 +923,7 @@ out_copy_to_user:
 static int copy_config_to_buf(const char *config_string, char *buf_ptr, size_t *copied_size, size_t bufsize) {
 	size_t tmp_size = strlen(config_string);
 
-	*copied_size += tmp_size;
+	*copied_size = tmp_size;
 	if (*copied_size >= bufsize) {
 		SUSFS_LOGE("bufsize is not big enough to hold the string.\n");
 		return -EINVAL;
@@ -952,52 +952,52 @@ void susfs_get_enabled_features(void __user **user_info) {
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_SUS_PATH\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_SUS_MOUNT\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_SUS_KSTAT\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_TRY_UMOUNT\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_SPOOF_UNAME
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_SPOOF_UNAME\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_ENABLE_LOG
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_ENABLE_LOG\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_OPEN_REDIRECT\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 	info->err = copy_config_to_buf("CONFIG_KSU_SUSFS_SUS_MAP\n", buf_ptr, &copied_size, SUSFS_ENABLED_FEATURES_SIZE);
 	if (info->err) goto out_copy_to_user;
-	buf_ptr = info->enabled_features + copied_size;
+	buf_ptr = info->enabled_features  copied_size;
 #endif
 
 	info->err = 0;
@@ -1065,7 +1065,7 @@ struct watch_dir {
 static struct fsnotify_group *g;
 
 static struct watch_dir g_watch = { .path = "/data/media/0", // we choose the underlying f2fs /data/media/0 instead of the FUSE /sdcard
-									.mask = (FS_EVENT_ON_CHILD | FS_ISDIR | FS_OPEN_PERM) };
+	.mask = (FS_EVENT_ON_CHILD | FS_ISDIR | FS_OPEN_PERM) };
 
 static int add_mark_on_inode(struct inode *inode, u32 mask,
 								struct fsnotify_mark **out);
@@ -1092,19 +1092,13 @@ static int watch_one_dir(struct watch_dir *wd)
 	return 0;
 }
 
-static int susfs_handle_sdcard_inode_event(struct fsnotify_group *group,
-											struct inode *to_tell,
-											struct fsnotify_mark *inode_mark,
-											struct fsnotify_mark *vfsmount_mark,
-											u32 mask, const void *data, int data_type,
-											const unsigned char *file_name, u32 cookie,
-											struct fsnotify_iter_info *iter_info)
+static SUSFS_DECL_FSNOTIFY_OPS(susfs_handle_sdcard_inode_event)
 {
 	static bool target_path_is_found = false;
 
 	if (target_path_is_found || !file_name)
 		return 0;
-	if (strlen(file_name) == 7 && !memcmp(file_name, "Android", 7)) {
+	if (susfs_fname_len(file_name) == 13 && !memcmp(susfs_fname_arg(file_name), "Android", 7)) {
 		target_path_is_found = true;
 		SUSFS_LOGI("'%s' detected, mask: 0x%x\n", SDCARD_ANDROID_DATA_PATH, mask);
 		SUSFS_LOGI("sleeping for 5 more seconds just in case some other modules are still mounting stuff\n");
@@ -1125,22 +1119,46 @@ static int susfs_handle_sdcard_inode_event(struct fsnotify_group *group,
 }
 
 static const struct fsnotify_ops fsnotify_ops = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+	.handle_inode_event = susfs_handle_sdcard_inode_event,
+#else
 	.handle_event = susfs_handle_sdcard_inode_event,
+#endif
 };
+
+static void __maybe_unused m_free(struct fsnotify_mark *m)
+{
+	if (m) {
+		kfree(m);
+	}
+}
 
 static int add_mark_on_inode(struct inode *inode, u32 mask,
 								struct fsnotify_mark **out)
 {
 	struct fsnotify_mark *m;
+	int ret;
 
 	m = kzalloc(sizeof(*m), GFP_KERNEL);
 	if (!m)
 		return -ENOMEM;
 
+/* From KernelSU */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 18, 0)
 	fsnotify_init_mark(m, g);
 	m->mask = mask;
+	ret = fsnotify_add_inode_mark(m, inode, 0);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+	fsnotify_init_mark(m, g);
+	m->mask = mask;
+	ret = fsnotify_add_mark(m, inode, NULL, 0);
+#else
+	fsnotify_init_mark(m, m_free);
+	m->mask = mask;
+	ret = fsnotify_add_mark(m, g, inode, NULL, 0);
+#endif
 
-	if (fsnotify_add_mark(m, inode, NULL, 0)) {
+	if (ret) {
 		fsnotify_put_mark(m);
 		return -EINVAL;
 	}
