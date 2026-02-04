@@ -17,6 +17,7 @@
 #include <linux/kthread.h>
 #include <linux/delay.h>
 #include <linux/fsnotify_backend.h>
+#include <linux/susfs_def.h>
 #include <linux/susfs.h>
 #include "mount.h"
 
