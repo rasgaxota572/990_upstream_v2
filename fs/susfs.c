@@ -1092,15 +1092,19 @@ static int watch_one_dir(struct watch_dir *wd)
 	return 0;
 }
 
-static int susfs_handle_sdcard_inode_event(struct fsnotify_mark *mark, u32 mask,
-											struct inode *inode, struct inode *dir,
-											const struct qstr *file_name, u32 cookie)
+static int susfs_handle_sdcard_inode_event(struct fsnotify_group *group,
+											struct inode *to_tell,
+											struct fsnotify_mark *inode_mark,
+											struct fsnotify_mark *vfsmount_mark,
+											u32 mask, const void *data, int data_type,
+											const unsigned char *file_name, u32 cookie,
+											struct fsnotify_iter_info *iter_info)
 {
 	static bool target_path_is_found = false;
 
 	if (target_path_is_found || !file_name)
 		return 0;
-	if (file_name->len == 7 && !memcmp(file_name->name, "Android", 7)) {
+	if (strlen(file_name) == 7 && !memcmp(file_name, "Android", 7)) {
 		target_path_is_found = true;
 		SUSFS_LOGI("'%s' detected, mask: 0x%x\n", SDCARD_ANDROID_DATA_PATH, mask);
 		SUSFS_LOGI("sleeping for 5 more seconds just in case some other modules are still mounting stuff\n");
@@ -1120,36 +1124,8 @@ static int susfs_handle_sdcard_inode_event(struct fsnotify_mark *mark, u32 mask,
 	return 0;
 }
 
-static int susfs_fsnotify_handle_event_4_19(
-    struct fsnotify_group *group,
-    struct inode *inode,
-    struct fsnotify_mark *inode_mark,
-    struct fsnotify_mark *vfsmount_mark,
-    u32 mask,
-    const void *data,
-    int data_type,
-    const unsigned char *file_name,
-    u32 cookie,
-    struct fsnotify_iter_info *iter_info
-)
-{
-    const struct qstr *qname = NULL;
-
-    if (data_type == FSNOTIFY_EVENT_INODE)
-        qname = data;
-
-    return susfs_handle_sdcard_inode_event(
-        inode_mark,
-        mask,
-        inode,
-        NULL,
-        qname,
-        cookie
-    );
-}
-
 static const struct fsnotify_ops fsnotify_ops = {
-	.handle_event = susfs_fsnotify_handle_event_4_19,
+	.handle_event = susfs_handle_sdcard_inode_event,
 };
 
 static int add_mark_on_inode(struct inode *inode, u32 mask,
