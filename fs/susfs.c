@@ -57,15 +57,15 @@ void susfs_set_i_state_on_external_dir(void __user **user_info) {
 		info.err = -EFAULT;
 		goto out_copy_to_user;
 	}
-		info.err = 0;
+	info.err = 0;
 out_copy_to_user:
 	if (copy_to_user(&((struct st_external_dir __user*)*user_info)->err, &info.err, sizeof(info.err))) {
 		info.err = -EFAULT;
 	}
 	if (info.cmd == CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH) {
-        SUSFS_LOGI("CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH deprecated, will be removed soon, ret: %d\n", info.err);
+		SUSFS_LOGI("CMD_SUSFS_SET_ANDROID_DATA_ROOT_PATH deprecated, will be removed soon, ret: %d\n", info.err);
 	} else if (info.cmd == CMD_SUSFS_SET_SDCARD_ROOT_PATH) {
-        SUSFS_LOGI("CMD_SUSFS_SET_SDCARD_ROOT_PATH, deprecated, will be removed soon, ret: %d\n", info.err);
+		SUSFS_LOGI("CMD_SUSFS_SET_SDCARD_ROOT_PATH, deprecated, will be removed soon, ret: %d\n", info.err);
 	}
 }
 
@@ -73,43 +73,43 @@ void susfs_add_sus_path(void __user **user_info) {
 	struct st_susfs_sus_path info = {0};
 	struct path path;
 	struct inode *inode = NULL;
-    struct fuse_inode *fi = NULL;
+	struct fuse_inode *fi = NULL;
 
 	if (copy_from_user(&info, (struct st_susfs_sus_path __user*)*user_info, sizeof(info))) {
 		info.err = -EFAULT;
 		goto out_copy_to_user;
 	}
 
-    info.err = kern_path(info.target_pathname, LOOKUP_FOLLOW, &path);
+	info.err = kern_path(info.target_pathname, LOOKUP_FOLLOW, &path);
 	if (info.err) {
-        SUSFS_LOGE("failed opening file '%s'\n", info.target_pathname);
+		SUSFS_LOGE("failed opening file '%s'\n", info.target_pathname);
 		goto out_copy_to_user;
 	}
 
-    inode = d_backing_inode(path.dentry);
-    if (!inode || !inode->i_mapping) {
-        SUSFS_LOGE("inode || inode->i_mapping is NULL\n");
-        info.err = -ENOENT;
+	inode = d_backing_inode(path.dentry);
+	if (!inode || !inode->i_mapping) {
+		SUSFS_LOGE("inode || inode->i_mapping is NULL\n");
+		info.err = -ENOENT;
 		goto out_path_put_path;
 	}
 
-    if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
-        fi = get_fuse_inode(inode);
-        if (!fi) {
-            SUSFS_LOGE("fi is NULL\n");
-            info.err = -ENOENT;
+	if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
+		fi = get_fuse_inode(inode);
+		if (!fi) {
+			SUSFS_LOGE("fi is NULL\n");
+			info.err = -ENOENT;
 			goto out_path_put_path;
 		}
-        set_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags);
-        SUSFS_LOGI("flagged AS_FLAGS_SUS_PATH on pathname: '%s', fi->nodeid: %llu, fi->inode.i_ino: %lu, fi->inode.i_mapping->flags: 0x%lx\n",
-                    info.target_pathname, fi->nodeid, fi->inode.i_ino, fi->inode.i_mapping->flags);
+		set_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags);
+		SUSFS_LOGI("flagged AS_FLAGS_SUS_PATH on pathname: '%s', fi->nodeid: %llu, fi->inode.i_ino: %lu, fi->inode.i_mapping->flags: 0x%lx\n", 
+					info.target_pathname, fi->nodeid, fi->inode.i_ino, fi->inode.i_mapping->flags);
 		info.err = 0;
 		goto out_path_put_path;
 	}
 
 	set_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags);
-    SUSFS_LOGI("flagged AS_FLAGS_SUS_PATH on pathname: '%s', ino: '%lu', inode->i_mapping->flags: 0x%lx\n",
-               info.target_pathname, info.target_ino, inode->i_mapping->flags);
+	SUSFS_LOGI("flagged AS_FLAGS_SUS_PATH on pathname: '%s', ino: '%lu', inode->i_mapping->flags: 0x%lx\n",
+				info.target_pathname, info.target_ino, inode->i_mapping->flags);
 	info.err = 0;
 out_path_put_path:
 	path_put(&path);
@@ -132,7 +132,7 @@ void susfs_add_sus_path_loop(void __user **user_info) {
 	new_list = kmalloc(sizeof(struct st_susfs_sus_path_list), GFP_KERNEL);
 	if (!new_list) {
 		info.err = -ENOMEM;
-        goto out_copy_to_user;
+		goto out_copy_to_user;
 	}
 	new_list->info.target_ino = info.target_ino;
 	strncpy(new_list->info.target_pathname, info.target_pathname, SUSFS_MAX_LEN_PATHNAME - 1);
@@ -157,83 +157,82 @@ void susfs_run_sus_path_loop(uid_t uid) {
 	struct st_susfs_sus_path_list *cursor = NULL;
 	struct path path;
 	struct inode *inode;
-    struct fuse_inode *fi = NULL;
+	struct fuse_inode *fi = NULL;
 
 	list_for_each_entry(cursor, &LH_SUS_PATH_LOOP, list) {
 		if (!kern_path(cursor->target_pathname, 0, &path)) {
-            inode = d_backing_inode(path.dentry);
-            if (!inode || !inode->i_mapping) {
-                path_put(&path);
-                continue;
-            }
-            if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
-                fi = get_fuse_inode(inode);
-                if (!fi) {
-                    SUSFS_LOGE("fi is NULL\n");
+			inode = d_backing_inode(path.dentry);
+			if (!inode || !inode->i_mapping) {
+				path_put(&path);
+				continue;
+			}
+			if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
+				fi = get_fuse_inode(inode);
+				if (!fi) {
+					SUSFS_LOGE("fi is NULL\n");
+					path_put(&path);
+					continue;
+				}
+				set_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags);
+			} else {
+				set_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags);
+			}
 			path_put(&path);
-                    continue;
+			SUSFS_LOGI("re-flag AS_FLAGS_SUS_PATH on path '%s' for uid: %u\n", cursor->target_pathname, uid);
 		}
-                set_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags);
-            } else {
-                set_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags);
 	}
-            path_put(&path);
-            SUSFS_LOGI("re-flag AS_FLAGS_SUS_PATH on path '%s' for uid: %u\n", cursor->target_pathname, uid);
-}
-}
 }
 
 static inline bool is_i_uid_not_allowed(uid_t i_uid) {
-    return likely(current_uid().val != i_uid);
+	return likely(current_uid().val != i_uid);
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 bool susfs_is_inode_sus_path(struct mnt_idmap* idmap, struct inode *inode) {
-    struct fuse_inode *fi = NULL;
-    if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
-        return false;
-}
-    if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
-        fi = get_fuse_inode(inode);
-        if (!fi) {
-            return false;
-        }
-        if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags) &&
-            is_i_uid_not_allowed(i_uid_into_vfsuid(idmap, &fi->inode).val))) {
-            SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
-            return true;
-}
+	struct fuse_inode *fi = NULL;
+	if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
 		return false;
 	}
-    if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags) &&
-        is_i_uid_not_allowed(i_uid_into_vfsuid(idmap, inode).val)))
-		{
-            SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
+	if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
+		fi = get_fuse_inode(inode);
+		if (!fi) {
+			return false;
+		}
+		if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags) &&
+			is_i_uid_not_allowed(i_uid_into_vfsuid(idmap, &fi->inode).val))) {
+			SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
 			return true;
 		}
-    return false;
+		return false;
 	}
+	if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags) &&
+		is_i_uid_not_allowed(i_uid_into_vfsuid(idmap, inode).val)))
+	{
+		SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
+		return true;
+	}
+	return false;
+}
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
 bool susfs_is_inode_sus_path(struct inode *inode) {
-    struct fuse_inode *fi = NULL;
-    if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
-	return false;
-}
-    if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
-        fi = get_fuse_inode(inode);
-        if (!fi) {
+	struct fuse_inode *fi = NULL;
+	if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
 		return false;
 	}
-        if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags) &&
-            is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val))) {
-            SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
+	if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
+		fi = get_fuse_inode(inode);
+		if (!fi) {
+			return false;
+		}
+		if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags) &&
+			is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(&fi->inode), &fi->inode).val))) {
+			SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
 			return true;
 		}
-
-	return false;
-}
-    if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags) &&
-        is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(inode), inode).val)))
+		return false;
+	}
+	if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags) &&
+		is_i_uid_not_allowed(i_uid_into_mnt(i_user_ns(inode), inode).val)))
 	{
 		SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
 		return true;
@@ -242,23 +241,23 @@ bool susfs_is_inode_sus_path(struct inode *inode) {
 }
 #else
 bool susfs_is_inode_sus_path(struct inode *inode) {
-    struct fuse_inode *fi = NULL;
-    if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
-        return false;
-    }
-    if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
-        fi = get_fuse_inode(inode);
-        if (!fi) {
-            return false;
-        }
-        if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags) &&
-            is_i_uid_not_allowed(fi->inode.i_uid.val))) {
-		SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
-		return true;
+	struct fuse_inode *fi = NULL;
+	if (current_uid().val < 10000 || !susfs_is_current_proc_umounted()) {
+		return false;
 	}
-	return false;
-}
-    if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags) &&
+	if (inode->i_sb->s_magic == FUSE_SUPER_MAGIC) {
+		fi = get_fuse_inode(inode);
+		if (!fi) {
+			return false;
+		}
+		if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &fi->inode.i_mapping->flags) &&
+			is_i_uid_not_allowed(fi->inode.i_uid.val))) {
+			SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
+			return true;
+		}
+		return false;
+	}
+	if (unlikely(test_bit(AS_FLAGS_SUS_PATH, &inode->i_mapping->flags) &&
 		is_i_uid_not_allowed(inode->i_uid.val)))
 	{
 		SUSFS_LOGI("hiding path with ino '%lu'\n", inode->i_ino);
@@ -301,27 +300,27 @@ out_copy_to_user:
 static DEFINE_SPINLOCK(susfs_spin_lock_sus_kstat);
 static DEFINE_HASHTABLE(SUS_KSTAT_HLIST, 10);
 static int susfs_update_sus_kstat_inode(char *target_pathname) {
-    struct path path;
+	struct path path;
 	struct inode *inode = NULL;
 	int err = 0;
 
-    err = kern_path(target_pathname, 0, &path);
+	err = kern_path(target_pathname, 0, &path);
 	if (err) {
-        SUSFS_LOGE("failed opening file '%s'\n", target_pathname);
-        return err;
+		SUSFS_LOGE("failed opening file '%s'\n", target_pathname);
+		return err;
 	}
 
-    inode = d_backing_inode(path.dentry);
-    if (!inode || !inode->i_mapping) {
-        SUSFS_LOGE("inode || inode->i_mapping is NULL\n");
-        err = -ENOENT;
-        goto out_puth_put_path;
+	inode = d_backing_inode(path.dentry);
+	if (!inode || !inode->i_mapping) {
+		SUSFS_LOGE("inode || inode->i_mapping is NULL\n");
+		err = -ENOENT;
+		goto out_puth_put_path;
 	}
 
-		set_bit(AS_FLAGS_SUS_KSTAT, &inode->i_mapping->flags);
-    
+	set_bit(AS_FLAGS_SUS_KSTAT, &inode->i_mapping->flags);
+
 out_puth_put_path:
-    path_put(&path);
+	path_put(&path);
 	return 0;
 }
 
@@ -358,8 +357,8 @@ void susfs_add_sus_kstat(void __user **user_info) {
 	new_entry->target_ino = info.target_ino;
 	memcpy(&new_entry->info, &info, sizeof(info));
 
-    info.err = susfs_update_sus_kstat_inode(new_entry->info.target_pathname);
-    if (info.err) {
+	info.err = susfs_update_sus_kstat_inode(new_entry->info.target_pathname);
+	if (info.err) {
 		kfree(new_entry);
 		goto out_copy_to_user;
 	}
@@ -409,8 +408,8 @@ void susfs_update_sus_kstat(void __user **user_info) {
 
 	hash_for_each_safe(SUS_KSTAT_HLIST, bkt, tmp_node, tmp_entry, node) {
 		if (!strcmp(tmp_entry->info.target_pathname, info.target_pathname)) {
-            info.err = susfs_update_sus_kstat_inode(tmp_entry->info.target_pathname);
-            if (info.err) {
+			info.err = susfs_update_sus_kstat_inode(tmp_entry->info.target_pathname);
+			if (info.err) {
 				goto out_copy_to_user;
 			}
 			new_entry = kmalloc(sizeof(struct st_susfs_sus_kstat_hlist), GFP_KERNEL);
@@ -678,27 +677,27 @@ static DEFINE_SPINLOCK(susfs_spin_lock_open_redirect);
 static DEFINE_HASHTABLE(OPEN_REDIRECT_HLIST, 10);
 
 static int susfs_update_open_redirect_inode(struct st_susfs_open_redirect_hlist *new_entry) {
-    struct path path;
-    struct inode *inode;
+	struct path path;
+	struct inode *inode;
 	int err = 0;
 
-    err = kern_path(new_entry->target_pathname, LOOKUP_FOLLOW, &path);
+	err = kern_path(new_entry->target_pathname, LOOKUP_FOLLOW, &path);
 	if (err) {
-        SUSFS_LOGE("failed opening file '%s'\n", new_entry->target_pathname);
+		SUSFS_LOGE("failed opening file '%s'\n", new_entry->target_pathname);
 		return err;
 	}
 
-    inode = d_backing_inode(path.dentry);
-    if (!inode || !inode->i_mapping) {
-        SUSFS_LOGE("inode || inode->i_mapping is NULL\n");
-        err = -ENOENT;
+	inode = d_backing_inode(path.dentry);
+	if (!inode || !inode->i_mapping) {
+		SUSFS_LOGE("inode || inode->i_mapping is NULL\n");
+		err = -ENOENT;
 		goto out_path_put_target;
 	}
 
-    set_bit(AS_FLAGS_OPEN_REDIRECT, &inode->i_mapping->flags);
+	set_bit(AS_FLAGS_OPEN_REDIRECT, &inode->i_mapping->flags);
 
 out_path_put_target:
-    path_put(&path);
+	path_put(&path);
 	return err;
 }
 
@@ -767,14 +766,14 @@ void susfs_add_sus_map(void __user **user_info) {
 
 	info.err = kern_path(info.target_pathname, LOOKUP_FOLLOW, &path);
 	if (info.err) {
-        SUSFS_LOGE("failed opening file '%s'\n", info.target_pathname);
+		SUSFS_LOGE("failed opening file '%s'\n", info.target_pathname);
 		goto out_copy_to_user;
 	}
 
-    inode = d_backing_inode(path.dentry);
-    if (!inode || !inode->i_mapping) {
-        SUSFS_LOGE("inode || inode->i_mapping is NULL\n");
-        info.err = -ENOENT;
+	inode = d_backing_inode(path.dentry);
+	if (!inode || !inode->i_mapping) {
+		SUSFS_LOGE("inode || inode->i_mapping is NULL\n");
+		info.err = -ENOENT;
 		goto out_path_put_path;
 	}
 	set_bit(AS_FLAGS_SUS_MAP, &inode->i_mapping->flags);
@@ -960,7 +959,7 @@ struct watch_dir {
 static struct fsnotify_group *g;
 
 static struct watch_dir g_watch = { .path = "/data/media/0", // we choose the underlying f2fs /data/media/0 instead of the FUSE /sdcard
-	.mask = (FS_EVENT_ON_CHILD | FS_ISDIR | FS_OPEN_PERM) };
+									.mask = (FS_EVENT_ON_CHILD | FS_ISDIR | FS_OPEN_PERM) };
 
 static int add_mark_on_inode(struct inode *inode, u32 mask,
 								struct fsnotify_mark **out);
@@ -972,17 +971,17 @@ static int watch_one_dir(struct watch_dir *wd)
 		SUSFS_LOGI("path not ready: %s (%d)\n", wd->path, ret);
 		return ret;
 	}
-    wd->inode = d_backing_inode(wd->kpath.dentry);
-    if (!wd->inode) {
-        SUSFS_LOGE("wd->inode is NULL\n");
-        path_put(&wd->kpath);
-        return -ENOENT;
-    }
+	wd->inode = d_backing_inode(wd->kpath.dentry);
+	if (!wd->inode) {
+		SUSFS_LOGE("wd->inode is NULL\n");
+		path_put(&wd->kpath);
+		return -ENOENT;
+	}
 	ihold(wd->inode);
 
 	ret = add_mark_on_inode(wd->inode, wd->mask, &wd->mark);
 	if (ret) {
-        SUSFS_LOGE("add mark failed for %s (%d)\n", wd->path, ret);
+		SUSFS_LOGE("add mark failed for %s (%d)\n", wd->path, ret);
 		iput(wd->inode);
 		wd->inode = NULL;
 		path_put(&wd->kpath);
@@ -1000,7 +999,7 @@ static SUSFS_DECL_FSNOTIFY_OPS(susfs_handle_sdcard_inode_event)
 		return 0;
 	if (susfs_fname_len(file_name) == 13 && !memcmp(susfs_fname_arg(file_name), "Android", 7)) {
 		target_path_is_found = true;
-        SUSFS_LOGI("'%s' detected, mask: 0x%x\n", SDCARD_ANDROID_PATH, mask);
+		SUSFS_LOGI("'%s' detected, mask: 0x%x\n", SDCARD_ANDROID_PATH, mask);
 		SUSFS_LOGI("sleeping for 5 more seconds just in case some other modules are still mounting stuff\n");
 		msleep(5000);
 		SUSFS_LOGI("set susfs_is_sdcard_android_data_decrypted to true\n");
@@ -1086,7 +1085,7 @@ static int susfs_sdcard_monitor_fn(void *data)
 	}
 
 	SUSFS_LOGI("start monitoring path '%s' using fsnotify\n",
-               SDCARD_ANDROID_PATH);
+				SDCARD_ANDROID_PATH);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
 	g = fsnotify_alloc_group(&fsnotify_ops, 0);
