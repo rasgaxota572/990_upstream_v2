@@ -1697,9 +1697,6 @@ static int lookup_fast(struct nameidata *nd,
 	if (nd->flags & LOOKUP_RCU) {
 		unsigned seq;
 		bool negative;
-#ifdef CONFIG_KSU_SUSFS_SUS_PATH
-		unsigned backup_next_seq;
-#endif
 
 		dentry = __d_lookup_rcu(parent, &nd->last, &seq);
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH
@@ -1707,7 +1704,7 @@ static int lookup_fast(struct nameidata *nd,
 			susfs_is_inode_sus_path(dentry->d_inode))
 		{
 			dput(dentry);
-			dentry = __d_lookup_rcu(parent, &susfs_fake_qstr_name, &backup_next_seq);
+			dentry = NULL;
 		}
 #endif
 		if (unlikely(!dentry)) {
@@ -1761,7 +1758,7 @@ static int lookup_fast(struct nameidata *nd,
 			susfs_is_inode_sus_path(dentry->d_inode))
 		{
 			dput(dentry);
-			dentry = __d_lookup(parent, &susfs_fake_qstr_name);
+			dentry = NULL;
 		}
 #endif
 		if (unlikely(!dentry))
@@ -3363,7 +3360,7 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 		susfs_is_inode_sus_path(dentry->d_inode))
 	{
 		dput(dentry);
-		dentry = d_lookup(dir, &susfs_fake_qstr_name);
+		dentry = NULL;
 		found_sus_path = true;
 	}
 #endif
