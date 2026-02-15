@@ -1029,8 +1029,8 @@ static int watch_one_dir(struct watch_dir *wd)
  */
 static SUSFS_DECL_FSNOTIFY_OPS(susfs_handle_sdcard_inode_event)
 {
-	if (!susfs_fname_len(file_name) != 13 ||
-	    memcmp(susfs_fname_arg(file_name), "Android", 7))
+	if (!file_name || file_name->len != 7 ||
+	    memcmp(file_name->name, "Android", 7))
 		return 0;
 
 	if (test_and_set_bit(0, &sdcard_cleanup_scheduled))
