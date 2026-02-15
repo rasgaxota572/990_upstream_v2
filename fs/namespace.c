@@ -3947,18 +3947,12 @@ void susfs_reorder_mnt_id(void) {
 		return;
 
 	down_read(&namespace_sem); // needed when manipulating mnt_namespace
-	lock_ns_list(mnt_ns); // needed when traversing mnt_ns->list
 	lock_mount_hash(); // needed when modifying mount
 
 	// - It is safe here as there should not be any first mnt with the sus mnt_id,
 	//   mount cloned by ksu proc is already handled in clone_mnt()
 	first_mnt_id = list_first_entry(&mnt_ns->list, struct mount, mnt_list)->mnt_id;
 	list_for_each_entry(mnt, &mnt_ns->list, mnt_list) {
-		// - We need to use mnt_is_cursor() to check if mnt is being looked up in
-		//   /proc/[mounts|mountinfo|mountstat], since mounts_open_common() will set 
-		//   the flag MNT_CURSOR on p->cursor.mnt.mnt_flags, skip it if so
-		if (mnt_is_cursor(mnt))
-			continue;
 		// It is very important that we don't reorder the sus mount if it is not umounted
 		if (mnt->mnt_id == DEFAULT_KSU_MNT_ID)
 			continue;
@@ -3968,7 +3962,6 @@ void susfs_reorder_mnt_id(void) {
 	}
 
 	unlock_mount_hash();
-	unlock_ns_list(mnt_ns);
 	up_read(&namespace_sem);
 }
 #endif
