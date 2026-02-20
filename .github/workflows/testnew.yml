@@ -1,4 +1,4 @@
-name: Test build
+name: Kernel build r8s
 
 on:
   workflow_dispatch:
@@ -55,7 +55,7 @@ jobs:
           make clean
           chmod +x ./build_kpm.sh
           chmod +x ./build_unpatched.sh
-          ./build_kpm.sh -m z3s -k y -r n
+          ./build_kpm.sh -m r8s -k y -r n
           
       - name: Find built zips
         id: find_zips
